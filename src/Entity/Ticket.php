@@ -48,6 +48,8 @@ use App\Controller\StatusController;
     normalizationContext: ['groups' => ['ticket:read']],
     denormalizationContext: ['groups' => ['ticket:write']]
 )]
+
+#[ORM\HasLifecycleCallbacks] 
 class Ticket
 {
 

@@ -20,8 +20,8 @@ trait TimestampableTrait
     public function setCreatedAt(): void
     {
 
-            $this->createdAt = new \DateTimeImmutable();
-      
+           $this->createdAt = new \DateTimeImmutable();
+ 
     }
 
     #[ORM\PreUpdate]
