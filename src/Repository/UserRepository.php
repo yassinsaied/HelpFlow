@@ -38,14 +38,20 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
     public function findAvailableTechnicians(int $organizationId): array
     {
         return $this->createQueryBuilder('u')
-            ->where('u.organization = :orgId')
-            ->andWhere('u.isActive = true')
-            ->andWhere('u.roles LIKE :roles')
-            ->setParameter('orgId', $organizationId)
-            ->setParameter('roles', 'ROLE_TECHNICIAN')
-            ->getQuery()
-            ->getResult();
+        ->select('u.id, u.email, COUNT(t.id) AS assignedTicketsCount')
+        ->leftJoin('u.assignedTickets', 't') // Jointure sur les tickets assignés
+        ->where('u.organization = :orgId')
+        ->andWhere('u.isActive = true')
+        ->andWhere('u.roles LIKE :roles') // Filtrage des techniciens
+        ->groupBy('u.id') // Regroupement par utilisateur
+        ->having('COUNT(t.id) < 3') // Filtrage des utilisateurs avec moins de 3 tickets
+        ->orderBy('COUNT(t.id)', 'ASC') // Priorité aux moins chargés
+        ->setParameter('orgId', $organizationId)
+        ->setParameter('roles', '%"ROLE_TECHNICIAN"%') // Format JSON pour les rôles
+        ->getQuery()
+        ->getResult();
     }
+
 
 
 //    /**

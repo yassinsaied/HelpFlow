@@ -34,15 +34,25 @@ class TicketDispatcher
         }
     }
 
-    private function findBestTechnician(int $organizationId): ?User
+  // src/Service/TicketDispatcher.php
+
+    public function findBestTechnician(int $organizationId): ?User
     {
-        $technicians = $this->userRepository->findAvailableTechnicians($organizationId);
+        $technicians = $this->userRepository
+            ->findAvailableTechnicians($organizationId);
 
         if (empty($technicians)) {
             return null;
         }
 
-        // Algorithme de sélection simple : premier technicien disponible
-        return $technicians[0];
+        // Tri par statut prioritaire
+        usort($technicians, function(User $a, User $b) {
+            return $a->getTechStatus() <=> $b->getTechStatus();
+        });
+
+        $selected = $technicians[0];
+        $selected->updateStatus($selected->getOpenTicketsCount() + 1);
+        
+        return $selected;
     }
 }

@@ -7,6 +7,7 @@ use ApiPlatform\Metadata\Put;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Delete;
+use App\Entity\Enum\TechnicianStatus;
 use Doctrine\ORM\Mapping as ORM;
 use App\Entity\Enum\TicketStatus;
 use App\Repository\UserRepository;
@@ -136,6 +137,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OneToMany(targetEntity: Ticket::class, mappedBy: 'assignedTo')]
     #[Groups(['user:item:get'])]
     private Collection $assignedTickets;
+
+    #[ORM\Column(type: 'string', enumType: TechnicianStatus::class)]
+    #[Groups(['user:read'])]
+    private ?TechnicianStatus $TechStatus = TechnicianStatus::AVAILABLE;
 
     public function __construct()
     {
@@ -372,13 +377,38 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function getOpenTicketsCount(): int
     {
-        return $this->assignedTickets->filter(fn(Ticket $t) => 
-            $t->getStatus() !== TicketStatus::RESOLVED
-        )->count();
+        return $this->assignedTickets
+            ->filter(fn(Ticket $t) => !in_array($t->getStatus(), [
+                TicketStatus::RESOLVED
+            ]))
+            ->count();
     }
 
     public function hasRole(string $role): bool
     {
         return in_array(strtoupper($role), $this->getRoles(), true);
     }
+
+    public function getTechStatus(): ?TechnicianStatus
+    {
+        return $this->TechStatus;
+    }
+
+    public function setTechStatus(TechnicianStatus $TechStatus): static
+    {
+        $this->TechStatus = $TechStatus;
+
+        return $this;
+    }
+
+    public function updateStatus(int $openTicketsCount): void
+    {
+        $this->status = match(true) {
+            $openTicketsCount <= 1 => TechnicianStatus::AVAILABLE,
+            $openTicketsCount === 2 => TechnicianStatus::ACTIVE,
+            default => TechnicianStatus::BUSY
+        };
+    }
+
+    
 }

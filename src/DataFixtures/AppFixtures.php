@@ -41,22 +41,29 @@ class AppFixtures extends Fixture
             'admin@support.com',
             'admin123',
             ['ROLE_ADMIN'],
-            null
+            null,
+          
         );
         $manager->persist($admin);
-        $globalUsers[] = $admin;
 
-        // Techniciens globaux (3)
-        for ($i = 1; $i <= 3; $i++) {
+        // Techniciens globaux (5)
+        for ($i = 1; $i <= 5; $i++) {
             $tech = $this->createUser(
                 "tech{$i}@support.com",
                 'password',
                 ['ROLE_TECHNICIAN'],
-                null
-            );
+                null,
+              ) ;
+            
             $manager->persist($tech);
             $globalUsers[] = $tech;
         }
+
+        // Compteur de tickets par technicien
+        $techTicketCounts = array_combine(
+            array_map(fn($tech) => $tech->getEmail(), $globalUsers),
+            array_fill(0, count($globalUsers), 0)
+        );
 
         // 3. Création des utilisateurs par organisation
         foreach ($organizations as $org) {
@@ -65,7 +72,8 @@ class AppFixtures extends Fixture
                 "manager@{$org->getName()}.com",
                 'password',
                 ['ROLE_MANAGER'],
-                $org
+                $org,
+                
             );
             $manager->persist($managerUser);
 
@@ -75,12 +83,18 @@ class AppFixtures extends Fixture
                     "client{$i}@{$org->getName()}.com",
                     'password',
                     ['ROLE_CLIENT'],
-                    $org
+                    $org,
+                    
                 );
                 $manager->persist($client);
 
-                // Création des tickets
-                $this->createTicketsForClient($client, $globalUsers, $manager);
+                // Création des tickets avec suivi du compteur
+                $this->createTicketsForClient(
+                    $client, 
+                    $globalUsers,
+                    $manager,
+                    $techTicketCounts
+                );
             }
         }
 
@@ -102,20 +116,21 @@ class AppFixtures extends Fixture
             ->setFirstName(explode('@', $email)[0])
             ->setLastName('Doe')
             ->setCreatedAt();
-
+    
         return $user;
     }
+    
 
     private function createTicketsForClient(
         User $client, 
         array $technicians,
-        ObjectManager $manager
+        ObjectManager $manager,
+        array &$techTicketCounts
     ): void {
         $statuses = TicketStatus::cases();
         $priorities = TicketPriority::cases();
 
-        // Création de 1 à 5 tickets par client
-        for ($i = 0; $i < rand(1, 5); $i++) {
+        for ($i = 0; $i < rand(1, 10); $i++) {
             $ticket = new Ticket();
             $ticket->setTitle("Problème " . ($i + 1))
                 ->setDescription("Description détaillée du problème n°" . ($i + 1))
@@ -123,13 +138,36 @@ class AppFixtures extends Fixture
                 ->setOrganization($client->getOrganization())
                 ->setPriority($priorities[array_rand($priorities)])
                 ->setStatus($statuses[array_rand($statuses)])
-                ->manuallySetCreatedAt(
-                    new \DateTimeImmutable('now')
-                );
+                ->manuallySetCreatedAt(new \DateTimeImmutable());
 
-            // Assignation aléatoire si le statut n'est pas NEW
-            if (!$ticket->getStatus() === TicketStatus::NEW) {
-                $ticket->setAssignedTo($technicians[array_rand($technicians)]);
+            // Assignation uniquement si le statut n'est pas NOUVEAU
+            if ($ticket->getStatus() !== TicketStatus::NEW) {
+                // Filtre les techniciens avec moins de 3 tickets ET rôle valide
+                $availableTechs = array_filter(
+                    $technicians,
+                    function($tech) use ($techTicketCounts) {
+                        return 
+                            in_array('ROLE_TECHNICIAN', $tech->getRoles()) &&
+                            $techTicketCounts[$tech->getEmail()] < 3;
+                    }
+                );
+    
+                if (!empty($availableTechs)) {
+                    $selectedTech = $availableTechs[array_rand($availableTechs)];
+                    
+                    // Assignation du ticket
+                    $ticket->setAssignedTo($selectedTech);
+                    
+                    // Mise à jour du compteur
+                    $techTicketCounts[$selectedTech->getEmail()]++;
+                    
+                    // MAJ statut BASÉE SUR LE RÔLE
+                    if (in_array('ROLE_TECHNICIAN', $selectedTech->getRoles())) {
+                        $newStatus = min($techTicketCounts[$selectedTech->getEmail()], 3);
+                        $selectedTech->updateStatus($newStatus);
+                        $manager->persist($selectedTech); // Sauvegarde du statut
+                    }
+                }
             }
 
             $manager->persist($ticket);
