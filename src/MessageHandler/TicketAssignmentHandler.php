@@ -15,29 +15,15 @@ class TicketAssignmentHandler
 {
     public function __construct(
         private TicketDispatcher $ticketDispatcher,
-        private EntityManagerInterface $em
+        private EntityManagerInterface $entityManager
     ) {}
 
     public function __invoke(TicketAssignmentMessage $message): void
     {
-        $ticket = $this->em->find(Ticket::class, $message->getTicketId());
-        $technician = $this->ticketDispatcher->findBestTechnician($message->getOrganizationId());
-        dd($technician  ,  $ticket ) ;
-        if ($technician) {
-            $ticket->setAssignedTo($technician)
-                   ->setStatus(TicketStatus::ASSIGNED);
-    
-            $this->em->flush();
-            
-            // Mise à jour du statut
-            $technician->updateStatus($technician->getOpenTicketsCount());
-            $this->em->flush();
+        $ticket = $this->entityManager->find(Ticket::class, $message->getTicketId());
+        
+        if ($ticket) {
+            $this->ticketDispatcher->assignTicket($ticket);
         }
-        
-        
-        // $this->ticketDispatcher->assignTicket(
-        //     $message->getTicketId(),
-        //     $message->getOrganizationId()
-        // );
     }
 }

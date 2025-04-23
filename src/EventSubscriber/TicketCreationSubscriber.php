@@ -5,6 +5,7 @@ namespace App\EventSubscriber;
 use App\Entity\Ticket;
 use App\Message\TicketAssignmentMessage;
 use Doctrine\Bundle\DoctrineBundle\EventSubscriber\EventSubscriberInterface;
+use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;
 use Doctrine\ORM\Events;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Doctrine\ORM\Event\PrePersistEventArgs;
@@ -12,7 +13,8 @@ use Doctrine\ORM\Event\PostPersistEventArgs;
 use Symfony\Component\Security\Core\Security;
 use App\Entity\User;
 
-
+#[AsDoctrineListener(event: Events::prePersist)]
+#[AsDoctrineListener(event: Events::postPersist)]
 class TicketCreationSubscriber implements EventSubscriberInterface
 {
     public function __construct(

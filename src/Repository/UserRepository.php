@@ -3,11 +3,12 @@
 namespace App\Repository;
 
 use App\Entity\User;
-use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use App\Entity\Enum\TicketStatus;
 use Doctrine\Persistence\ManagerRegistry;
+use Symfony\Component\Security\Core\User\PasswordUpgraderInterface;
+use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Symfony\Component\Security\Core\Exception\UnsupportedUserException;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
-use Symfony\Component\Security\Core\User\PasswordUpgraderInterface;
 
 /**
  * @extends ServiceEntityRepository<User>
@@ -35,21 +36,25 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
 
 
 
-    public function findAvailableTechnicians(int $organizationId): array
-    {
-        return $this->createQueryBuilder('u')
-        ->select('u.id, u.email, COUNT(t.id) AS assignedTicketsCount')
-        ->leftJoin('u.assignedTickets', 't') // Jointure sur les tickets assignés
-        ->where('u.organization = :orgId')
-        ->andWhere('u.isActive = true')
-        ->andWhere('u.roles LIKE :roles') // Filtrage des techniciens
-        ->groupBy('u.id') // Regroupement par utilisateur
-        ->having('COUNT(t.id) < 3') // Filtrage des utilisateurs avec moins de 3 tickets
-        ->orderBy('COUNT(t.id)', 'ASC') // Priorité aux moins chargés
-        ->setParameter('orgId', $organizationId)
-        ->setParameter('roles', '%"ROLE_TECHNICIAN"%') // Format JSON pour les rôles
+    public function findAvailableTechnicians(): array
+    {  
+        $results = $this->createQueryBuilder('u')
+        ->select('u, COUNT(t.id) as ticketCount')
+        ->leftJoin('u.assignedTickets', 't', 'WITH', 't.status != :resolvedStatus')
+        ->where('u.isActive = true')
+        ->andWhere('u.roles LIKE :role')
+        ->andWhere('u.organization IS NULL') // Techniciens sans organisation
+        ->groupBy('u.id')
+        ->having('ticketCount < 3') // Moins de 3 tickets actifs
+        ->orderBy('ticketCount', 'ASC') // Priorité aux moins chargés
+        ->setParameter('role', '%ROLE_TECHNICIAN%')
+        ->setParameter('resolvedStatus', TicketStatus::RESOLVED->value)
         ->getQuery()
         ->getResult();
+
+        // Retourne uniquement les entités User
+      return array_map(fn($item) => $item[0], $results);
+
     }
 
 

@@ -7,6 +7,7 @@ use App\Entity\User;
 use App\Entity\Ticket;
 use App\Entity\Enum\TicketStatus;
 use App\Repository\UserRepository;
+use App\Entity\Enum\TechnicianStatus;
 use Doctrine\ORM\EntityManagerInterface;
 
 class TicketDispatcher
@@ -16,43 +17,51 @@ class TicketDispatcher
         private EntityManagerInterface $entityManager
     ) {}
 
-    public function assignTicket(int $ticketId, int $organizationId): void
+    public function assignTicket(Ticket $ticket): void
     {
-        $ticket = $this->entityManager->find(Ticket::class, $ticketId);
+        $technician = $this->findBestTechnician();
         
-        if (!$ticket) {
-            throw new \InvalidArgumentException('Ticket not found');
-        }
-
-        $technician = $this->findBestTechnician($organizationId);
-
         if ($technician) {
-            $ticket->setAssignedTo($technician)
-                ->setStatus(TicketStatus::ASSIGNED);
-
-            $this->entityManager->flush();
+            $this->assignToTechnician($ticket, $technician);
         }
+
+        // Si aucun technicien, le ticket reste en NEW
+
+       
     }
 
-  // src/Service/TicketDispatcher.php
-
-    public function findBestTechnician(int $organizationId): ?User
+    private function findBestTechnician(): ?User
     {
-        $technicians = $this->userRepository
-            ->findAvailableTechnicians($organizationId);
+        $technicians = $this->userRepository->findAvailableTechnicians();
+        return $technicians[0] ?? null;
+    }
 
-        if (empty($technicians)) {
-            return null;
-        }
+    
+    private function assignToTechnician(Ticket $ticket, User $technician): void
+    {
+        // 1. Assigner le ticket
+        $ticket->setAssignedTo($technician)
+               ->setStatus(TicketStatus::ASSIGNED);
 
-        // Tri par statut prioritaire
-        usort($technicians, function(User $a, User $b) {
-            return $a->getTechStatus() <=> $b->getTechStatus();
-        });
+        // 2. Mettre à jour le statut du technicien
+        $this->updateTechnicianStatus($technician);
 
-        $selected = $technicians[0];
-        $selected->updateStatus($selected->getOpenTicketsCount() + 1);
-        
-        return $selected;
+        // 3. Sauvegarder
+        $this->entityManager->flush();
+    }
+
+    private function updateTechnicianStatus(User $technician): void
+    {
+        $openTicketsCount = $technician->getAssignedTickets()
+            ->filter(fn(Ticket $t) => $t->getStatus() !== TicketStatus::RESOLVED)
+            ->count();
+
+        $newStatus = match(true) {
+            $openTicketsCount >= 3 => TechnicianStatus::BUSY,
+            $openTicketsCount === 2 => TechnicianStatus::ACTIVE,
+            default => TechnicianStatus::AVAILABLE
+        };
+
+        $technician->setTechStatus($newStatus);
     }
 }
