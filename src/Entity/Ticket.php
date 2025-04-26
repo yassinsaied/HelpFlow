@@ -40,7 +40,7 @@ use App\Controller\StatusController;
         new Patch(
             uriTemplate: '/tickets/{id}/status',
             security: "is_granted('TICKET_CHANGE_STATUS', object)", // Correspond à la constante du voter
-            denormalizationContext: ['groups' => ['ticket:status:update']],
+            denormalizationContext: ['groups' => ['ticket:status:update' , 'ticket:status:update']],
             controller: StatusController::class
         ),
         new Delete(security: "is_granted('ROLE_ADMIN')"),

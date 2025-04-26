@@ -12,7 +12,7 @@ final class TicketVoter extends Voter
     public const TICKET_VIEW = 'TICKET_VIEW';
     public const TICKET_EDIT = 'TICKET_EDIT';
     public const TICKET_ASSIGN = 'TICKET_ASSIGN';
-    public const TICKET_CHANGE_STATUS = 'CHANGE_STATUS';
+    public const TICKET_CHANGE_STATUS = 'TICKET_CHANGE_STATUS';
 
     protected function supports(string $attribute, mixed $subject): bool
     {
@@ -46,17 +46,33 @@ final class TicketVoter extends Voter
 
     private function canView(Ticket $ticket, User $user): bool
     {
-        return $user->hasRole('ROLE_ADMIN') 
-            || ($user->hasRole('ROLE_MANAGER') && $this->sameOrganization($ticket, $user))
-            || $user === $ticket->getCreatedBy()
-            || $user === $ticket->getAssignedTo();
+        if ($user->hasRole('ROLE_ADMIN')) {
+            return true;
+        }
+
+        // Manager voit les tickets de son organisation
+        if ($user->hasRole('ROLE_MANAGER') && $this->sameOrganization($ticket, $user)) {
+            return true;
+        }
+
+        // Technicien voit les tickets qui lui sont assignés
+        if ($user->hasRole('ROLE_TECHNICIAN') && $user === $ticket->getAssignedTo()) {
+            return true;
+        }
+
+        // Client voit les tickets qu'il a créés
+        return $user === $ticket->getCreatedBy();
     }
 
     private function canEdit(Ticket $ticket, User $user): bool
     {
-        return $user->hasRole('ROLE_ADMIN')
-            || ($user->hasRole('ROLE_MANAGER') && $this->sameOrganization($ticket, $user))
-            || $user === $ticket->getAssignedTo();
+           // Client peut modifier le contenu seulement si non assigné
+        if ($user === $ticket->getCreatedBy() && $ticket->getAssignedTo() === null || $user->hasRole('ROLE_TECHNICIAN') ) {
+            return true;
+        }
+
+        // Admin peut tout modifier
+        return $user->hasRole('ROLE_ADMIN');
     }
 
     private function canAssign(Ticket $ticket, User $user): bool
@@ -66,11 +82,10 @@ final class TicketVoter extends Voter
     }
 
     private function canChangeStatus(Ticket $ticket, User $user): bool
-    {
+    {   
+        // Seuls les admins et les techniciens assignés peuvent modifier le statut
         return $user->hasRole('ROLE_ADMIN')
-            || ($user->hasRole('ROLE_MANAGER') && $this->sameOrganization($ticket, $user))
-            || $user === $ticket->getCreatedBy()
-            || $user === $ticket->getAssignedTo();
+            || ($user->hasRole('ROLE_TECHNICIAN') && $user === $ticket->getAssignedTo());
     }
 
     private function sameOrganization(Ticket $ticket, User $user): bool
