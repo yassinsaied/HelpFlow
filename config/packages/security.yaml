@@ -79,6 +79,7 @@ security:
       - { path: ^/home, roles: ROLE_CLIENT }
       - { path: ^/profile, roles: ROLE_USER }
       - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
+      - { path: ^/\.well-known/mercure, roles: IS_AUTHENTICATED_FULLY }
 
 when@test:
    security:

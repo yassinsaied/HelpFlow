@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Entity\Ticket;
 use App\Entity\Enum\TicketStatus;
+use App\Service\NotificationService;
 use App\Entity\Enum\TechnicianStatus;
 use Doctrine\ORM\EntityManagerInterface;
 use ApiPlatform\Api\IriConverterInterface;
@@ -18,7 +19,8 @@ class AssignmentController extends AbstractController
 {
     public function __construct(
         private EntityManagerInterface $entityManager,
-        private IriConverterInterface $iriConverter
+        private IriConverterInterface $iriConverter,
+        private NotificationService $notificationService
     ) {}
 
     
@@ -66,6 +68,17 @@ class AssignmentController extends AbstractController
             $newLoad == 2 => TechnicianStatus::ACTIVE,
             default => TechnicianStatus::AVAILABLE
         });
+
+
+          // Envoyer une notification
+          $this->notificationService->createNotification(
+            $technician,
+            sprintf('Le ticket #%d vous a été assigné manuellement', $ticket->getId()),
+            '/notifications/' . $technician->getId(),
+            'ticket_assigned'
+        );
+
+        $this->notificationService->publishTicketUpdate($ticket);
 
         $this->entityManager->flush();
 

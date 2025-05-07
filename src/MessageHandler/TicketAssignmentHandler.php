@@ -4,7 +4,6 @@
 namespace App\MessageHandler;
 
 use App\Entity\Ticket;
-use App\Entity\Enum\TicketStatus;
 use App\Service\TicketDispatcher;
 use App\Message\TicketAssignmentMessage;
 use Doctrine\ORM\EntityManagerInterface;
@@ -15,7 +14,8 @@ class TicketAssignmentHandler
 {
     public function __construct(
         private TicketDispatcher $ticketDispatcher,
-        private EntityManagerInterface $entityManager
+        private EntityManagerInterface $entityManager,
+       
     ) {}
 
     public function __invoke(TicketAssignmentMessage $message): void
@@ -25,5 +25,7 @@ class TicketAssignmentHandler
         if ($ticket) {
             $this->ticketDispatcher->assignTicket($ticket);
         }
+
+      
     }
 }

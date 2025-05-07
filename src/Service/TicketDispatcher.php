@@ -7,6 +7,7 @@ use App\Entity\User;
 use App\Entity\Ticket;
 use App\Entity\Enum\TicketStatus;
 use App\Repository\UserRepository;
+use App\Service\NotificationService;
 use App\Entity\Enum\TechnicianStatus;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -14,7 +15,8 @@ class TicketDispatcher
 {
     public function __construct(
         private UserRepository $userRepository,
-        private EntityManagerInterface $entityManager
+        private EntityManagerInterface $entityManager,
+        private NotificationService $notificationService
     ) {}
 
     public function assignTicket(Ticket $ticket): void
@@ -45,6 +47,16 @@ class TicketDispatcher
 
         // 2. Mettre à jour le statut du technicien
         $this->updateTechnicianStatus($technician);
+
+        // 3. Envoyer une notification
+        $this->notificationService->createNotification(
+            $technician,
+            sprintf('Un nouveau ticket #%d vous a été assigné', $ticket->getId()),
+            '/notifications/' . $technician->getId(),
+            'ticket_assigned'
+        );
+
+        $this->notificationService->publishTicketUpdate($ticket);
 
         // 3. Sauvegarder
         $this->entityManager->flush();

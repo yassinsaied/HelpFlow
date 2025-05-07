@@ -142,12 +142,19 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read'])]
     private ?TechnicianStatus $TechStatus = TechnicianStatus::AVAILABLE;
 
+    /**
+     * @var Collection<int, Notification>
+     */
+    #[ORM\OneToMany(targetEntity: Notification::class, mappedBy: 'recipient', orphanRemoval: true)]
+    private Collection $notifications;
+
     public function __construct()
     {
         $this->alerts = new ArrayCollection();
         $this->roles = ['ROLE_CLIENT']; 
         $this->createdTickets = new ArrayCollection();
-        $this->assignedTickets = new ArrayCollection(); 
+        $this->assignedTickets = new ArrayCollection();
+        $this->notifications = new ArrayCollection(); 
     }
     
 
@@ -408,6 +415,36 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
             $openTicketsCount === 2 => TechnicianStatus::ACTIVE,
             default => TechnicianStatus::BUSY
         };
+    }
+
+    /**
+     * @return Collection<int, Notification>
+     */
+    public function getNotifications(): Collection
+    {
+        return $this->notifications;
+    }
+
+    public function addNotification(Notification $notification): static
+    {
+        if (!$this->notifications->contains($notification)) {
+            $this->notifications->add($notification);
+            $notification->setRecipient($this);
+        }
+
+        return $this;
+    }
+
+    public function removeNotification(Notification $notification): static
+    {
+        if ($this->notifications->removeElement($notification)) {
+            // set the owning side to null (unless already changed)
+            if ($notification->getRecipient() === $this) {
+                $notification->setRecipient(null);
+            }
+        }
+
+        return $this;
     }
 
     

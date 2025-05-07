@@ -9,18 +9,25 @@ use Symfony\Component\Serializer\Annotation\Groups;
 trait TimestampableTrait
 {
     #[ORM\Column]
-    #[Groups(['user:read', 'organization:read', 'ticket:read'])]
+    #[Groups([
+        'user:read', 'organization:read', 'ticket:read', 'notification:read',
+        'user:write', 'organization:write', 'ticket:write', 'notification:write'
+    ])]
     private ?\DateTimeImmutable $createdAt;
 
     #[ORM\Column(nullable: true)]
-    #[Groups(['user:read', 'organization:read', 'ticket:read'])]
-    private ?\DateTimeImmutable $updatedAt = null;
+    #[Groups([
+        'user:read', 'organization:read', 'ticket:read', 'notification:read',
+        'user:write', 'organization:write', 'ticket:write', 'notification:write'
+    ])]    private ?\DateTimeImmutable $updatedAt = null;
 
     #[ORM\PrePersist]
     public function setCreatedAt(): void
     {
 
-           $this->createdAt = new \DateTimeImmutable();
+    
+            $this->createdAt = new \DateTimeImmutable();
+       
  
     }
 
