@@ -74,12 +74,11 @@ class AssignmentController extends AbstractController
           $this->notificationService->createNotification(
             $technician,
             sprintf('Le ticket #%d vous a été assigné manuellement', $ticket->getId()),
-            '/notifications/' . $technician->getId(),
+            sprintf(NotificationService::TOPIC_TECHNICIAN, $technician->getId()),
             'ticket_assigned'
         );
 
-        $this->notificationService->publishTicketUpdate($ticket);
-
+     
         $this->entityManager->flush();
 
         return new JsonResponse([

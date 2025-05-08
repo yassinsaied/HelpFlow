@@ -51,14 +51,11 @@ class TicketDispatcher
         // 3. Envoyer une notification
         $this->notificationService->createNotification(
             $technician,
-            sprintf('Un nouveau ticket #%d vous a été assigné', $ticket->getId()),
-            '/notifications/' . $technician->getId(),
-            'ticket_assigned'
+              sprintf('Un nouveau ticket #%d vous a été assigné', $ticket->getId()),
+                sprintf(NotificationService::TOPIC_TECHNICIAN, $technician->getId()),
+                 'ticket_assigned'
         );
 
-        $this->notificationService->publishTicketUpdate($ticket);
-
-        // 3. Sauvegarder
         $this->entityManager->flush();
     }
 

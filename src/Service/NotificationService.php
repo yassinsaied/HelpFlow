@@ -12,7 +12,13 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Mercure\HubInterface;
 
 class NotificationService
-{
+{   
+
+    public const TOPIC_CLIENT = '/notifications/%d/client';
+    public const TOPIC_TECHNICIAN = '/notifications/%d/technician';
+    public const TOPIC_ADMIN = '/notifications/admin';
+
+
     public function __construct(
         private EntityManagerInterface $entityManager,
         private HubInterface $hub,
@@ -28,6 +34,7 @@ class NotificationService
         
 
     ): Notification {
+
         $notification = new Notification();
         $notification->setRecipient($recipient)
             ->setMessage($message)
@@ -40,46 +47,38 @@ class NotificationService
         $this->entityManager->flush();
 
         // Publier sur Mercure
-        $this->publishMercureUpdate($notification);
+        $this->publishMercureUpdate($notification , $topic);
 
         return $notification;
     }
 
 
-    public function publishTicketUpdate(Ticket $ticket): bool
-    {
-        try {
-            $update = new Update(
-                ['/tickets/' . $ticket->getId(), '/user/' . $ticket->getAssignedTo()?->getId()],
-                json_encode([
-                    '@id' => '/api/tickets/' . $ticket->getId(),
-                    '@type' => 'Ticket',
-                    'id' => $ticket->getId(),
-                    'status' => $ticket->getStatus()->value,
-                    'assignedTo' => $ticket->getAssignedTo()?->getId(),
-                    'updatedAt' => $ticket->getUpdatedAt()?->format(\DateTimeInterface::ATOM),
-                    'event' => 'ticket.updated'
-                ]),
-                true // Private update
-            );
+// Dans NotificationService.php, ajoutez cette méthode :
 
-            $this->hub->publish($update);
-            return true;
-        } catch (\Throwable $e) {
-            $this->logger->error('Failed to publish ticket update to Mercure', [
-                'exception' => $e->getMessage(),
-                'ticket_id' => $ticket->getId()
-            ]);
-            return false;
+    public function sendResolvedNotification(Ticket $ticket): void
+    {
+        $client = $ticket->getCreatedBy();
+     
+    
+        // Notification au client avec un topic spécifique
+        if ($client) {
+            $this->createNotification(
+                $client,
+                sprintf('Votre ticket #%d a été résolu', $ticket->getId()),
+                sprintf(self::TOPIC_CLIENT, $client->getId()), 
+                'ticket_resolved'
+            );
         }
+        
     }
 
-    private function publishMercureUpdate(Notification $notification): bool
+    private function publishMercureUpdate(Notification $notification , string $topic): bool
     {
         try {
+
             $update = new Update(
-                $notification->getTopic() ?? '/notifications/' . $notification->getRecipient()->getId(),
-                json_encode([
+                $topic,
+                  json_encode([
                     '@id' => '/api/notifications/' . $notification->getId(),
                     '@type' => 'Notification',
                     'id' => $notification->getId(),
@@ -88,14 +87,13 @@ class NotificationService
                     'createdAt' => $notification->getCreatedAt()->format(\DateTimeInterface::ATOM),
                     'type' => $notification->getType(),
                 ]),
-                // $notification->getTopic() !== null // Private si topic spécifique
+             
             );
 
-            // dd( $this->hub->publish($update)) ;
-         
+              
             $this->hub->publish($update);
-           
             return true;
+
         } catch (\Throwable $e) {
             $this->logger->error('Failed to publish notification to Mercure', [
                 'exception' => $e->getMessage(),
@@ -105,28 +103,13 @@ class NotificationService
         }
     }
 
-    // private function publishMercureUpdate(Notification $notification): void
-    // {
-    //     $update = new Update(
-    //         $notification->getTopic() ?? '/notifications/' . $notification->getRecipient()->getId(),
-    //         json_encode([
-    //             'id' => $notification->getId(),
-    //             'message' => $notification->getMessage(),
-    //             'isRead' => $notification->isRead(),
-    //             'createdAt' => $notification->getCreatedAt()->format(\DateTimeInterface::ATOM),
-    //             'type' => $notification->getType(),
-    //         ])
-    //     );
-
-    //     $this->hub->publish($update);
-    // }
+  
+  
 
     public function markAsRead(Notification $notification): void
     {
         $notification->setIsRead(true);
         $this->entityManager->flush();
 
-        // Mettre à jour via Mercure
-        $this->publishMercureUpdate($notification);
     }
 }

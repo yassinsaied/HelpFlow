@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Entity\Ticket;
 use App\Entity\Enum\TicketStatus;
+use App\Service\NotificationService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -18,7 +19,8 @@ class StatusController extends AbstractController
 {
     public function __construct(
         private EntityManagerInterface $entityManager,
-        private SerializerInterface $serializer
+        private SerializerInterface $serializer,
+        private NotificationService $notificationService
     ) {}
 
     public function __invoke(Ticket $ticket, Request $request): JsonResponse
@@ -49,6 +51,11 @@ class StatusController extends AbstractController
  
          // Modification du statut
          $ticket->setStatus($status);
+
+         if ($status === TicketStatus::RESOLVED) {
+         
+            $this->notificationService->sendResolvedNotification($ticket);
+        }
 
          $this->entityManager->flush();
 
